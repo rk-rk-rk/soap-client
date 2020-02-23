@@ -60,6 +60,12 @@ class Client
      */
     private $responseMessage;
 
+    /**
+     * @var callable
+     */
+    private $xmlDecorator;
+
+
     public function __construct(array $serviceDefinition, Serializer $serializer, MessageFactory $messageFactory, HttpClient $client, HeaderHandler $headerHandler)
     {
         $this->serviceDefinition = $serviceDefinition;
@@ -77,6 +83,10 @@ class Client
         $message = $this->argumentsReader->readArguments($args, $soapOperation['input']);
 
         $xmlMessage = $this->serializer->serialize($message, 'xml');
+        if (is_callable($this->xmlDecorator)) {
+            $xmlMessage = call_user_func($this->xmlDecorator, $xmlMessage);
+        }
+
         $headers = $this->buildHeaders($soapOperation);
         $this->requestMessage = $request = $this->messageFactory->createRequest('POST', $this->serviceDefinition['endpoint'], $headers, $xmlMessage);
 
@@ -167,5 +177,13 @@ class Client
             }
         }
         throw new ClientException("Can not find an operation to run $functionName service call");
+    }
+
+    /**
+     * @param callable $xmlDecorator
+     */
+    public function setXmlDecorator($xmlDecorator)
+    {
+        $this->xmlDecorator = $xmlDecorator;
     }
 }
