@@ -11,6 +11,7 @@ use GoetasWebservices\SoapServices\Metadata\Envelope\SoapEnvelope12\Messages\Fau
 use GoetasWebservices\SoapServices\Metadata\Headers\Header;
 use GoetasWebservices\SoapServices\Metadata\Headers\HeadersIncoming;
 use GoetasWebservices\SoapServices\Metadata\Headers\HeadersOutgoing;
+use GoetasWebservices\SoapServices\SoapClient\Events\ClientEvent;
 use GoetasWebservices\SoapServices\SoapClient\Exception\ClientException;
 use GoetasWebservices\SoapServices\SoapClient\Exception\Fault11Exception;
 use GoetasWebservices\SoapServices\SoapClient\Exception\Fault12Exception;
@@ -26,6 +27,7 @@ use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamFactoryInterface;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 class Client
 {
@@ -84,8 +86,19 @@ class Client
      */
     private $responseMessage;
 
-    public function __construct(array $serviceDefinition, SerializerInterface $serializer, RequestFactoryInterface $messageFactory, StreamFactoryInterface $streamFactory, ClientInterface $client)
-    {
+    /**
+     * @var EventDispatcherInterface
+     */
+    private $eventDispatcher;
+
+    public function __construct(
+        array $serviceDefinition,
+        SerializerInterface $serializer,
+        RequestFactoryInterface $messageFactory,
+        StreamFactoryInterface $streamFactory,
+        ClientInterface $client,
+        EventDispatcherInterface $eventDispatcher
+    ) {
         $this->serviceDefinition = $serviceDefinition;
         $this->serializer = $serializer;
 
@@ -94,6 +107,7 @@ class Client
         $this->streamFactory = $streamFactory;
         $this->argumentsReader = new ArgumentsReader($this->serializer);
         $this->resultCreator = new ResultCreator($this->serializer, !empty($serviceDefinition['unwrap']));
+        $this->eventDispatcher = $eventDispatcher;
     }
 
     public function setDebug(bool $debug): void
@@ -135,6 +149,7 @@ class Client
         $context->setAttribute('soapEndpoint', $this->serviceDefinition['endpoint']);
 
         $xmlMessage = $this->serializer->serialize($message, 'xml', $context);
+        $this->eventDispatcher->dispatch(new ClientEvent($xmlMessage), 'soap_client.post_serialize');
 
         $requestMessage = $this->createRequestMessage($xmlMessage, $soapOperation);
 
@@ -157,6 +172,8 @@ class Client
         }
 
         $body = (string) $responseMessage->getBody();
+        $this->eventDispatcher->dispatch(new ClientEvent($body), 'soap_client.response');
+
         if (false !== strpos($body, ':Fault>')) { // some server returns a fault with 200 OK HTTP
             throw $this->createFaultException($responseMessage, $requestMessage);
         }

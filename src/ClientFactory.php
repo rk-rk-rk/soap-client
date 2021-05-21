@@ -12,6 +12,8 @@ use JMS\Serializer\SerializerInterface;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\StreamFactoryInterface;
+use Symfony\Component\EventDispatcher\EventDispatcher;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 class ClientFactory
 {
@@ -39,6 +41,11 @@ class ClientFactory
      */
     private $streamFactory;
 
+    /**
+     * @var EventDispatcherInterface
+     */
+    private $eventDispatcher;
+
     public function __construct(MetadataLoaderInterface $reader, SerializerInterface $serializer)
     {
         $this->setMetadataReader($reader);
@@ -65,6 +72,11 @@ class ClientFactory
         $this->reader = $reader;
     }
 
+    public function setEventDispatcher(EventDispatcherInterface $dispatcher): void
+    {
+        $this->eventDispatcher = $dispatcher;
+    }
+
     private function getSoapService(string $wsdl, ?string $portName = null, ?string $serviceName = null): array
     {
         $servicesMetadata = $this->reader->load($wsdl);
@@ -80,7 +92,15 @@ class ClientFactory
         $this->httpClient = $this->httpClient ?: Psr18ClientDiscovery::find();
         $this->messageFactory = $this->messageFactory ?: Psr17FactoryDiscovery::findRequestFactory();
         $this->streamFactory = $this->streamFactory ?: Psr17FactoryDiscovery::findStreamFactory();
+        $this->eventDispatcher = $this->eventDispatcher ?: new EventDispatcher();
 
-        return new Client($service, $this->serializer, $this->messageFactory, $this->streamFactory, $this->httpClient);
+        return new Client(
+            $service,
+            $this->serializer,
+            $this->messageFactory,
+            $this->streamFactory,
+            $this->httpClient,
+            $this->eventDispatcher
+        );
     }
 }
