@@ -11,6 +11,8 @@ use Http\Discovery\HttpClientDiscovery;
 use Http\Discovery\MessageFactoryDiscovery;
 use Http\Message\MessageFactory;
 use JMS\Serializer\SerializerInterface;
+use Symfony\Component\EventDispatcher\EventDispatcher;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 class ClientFactory
 {
@@ -37,6 +39,11 @@ class ClientFactory
      * @var HeaderHandler
      */
     private $headerHandler;
+
+    /**
+     * @var EventDispatcherInterface
+     */
+    private $eventDispatcher;
 
     public function __construct(MetadataLoaderInterface $reader, SerializerInterface $serializer)
     {
@@ -72,6 +79,11 @@ class ClientFactory
         $this->reader = $reader;
     }
 
+    public function setEventDispatcher(EventDispatcherInterface $dispatcher): void
+    {
+        $this->eventDispatcher = $dispatcher;
+    }
+
     private function getSoapService($wsdl, $portName = null, $serviceName = null)
     {
         $servicesMetadata = $this->reader->load($wsdl);
@@ -92,8 +104,9 @@ class ClientFactory
         $this->httpClient = $this->httpClient ?: HttpClientDiscovery::find();
         $this->messageFactory = $this->messageFactory ?: MessageFactoryDiscovery::find();
         $headerHandler = $this->headerHandler ?: new HeaderHandler();
+        $this->eventDispatcher = $this->eventDispatcher ?: new EventDispatcher();
 
-        return new Client($service, $this->serializer, $this->messageFactory, $this->httpClient, $headerHandler);
+        return new Client($service, $this->serializer, $this->messageFactory, $this->httpClient, $headerHandler, $this->eventDispatcher);
     }
 
     /**

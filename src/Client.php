@@ -7,6 +7,7 @@ use GoetasWebservices\SoapServices\SoapClient\Arguments\ArgumentsReaderInterface
 use GoetasWebservices\SoapServices\SoapClient\Arguments\Headers\Handler\HeaderHandler;
 use GoetasWebservices\SoapServices\SoapClient\Envelope\SoapEnvelope\Messages\Fault as Fault11;
 use GoetasWebservices\SoapServices\SoapClient\Envelope\SoapEnvelope12\Messages\Fault as Fault12;
+use GoetasWebservices\SoapServices\SoapClient\Events\ClientEvent;
 use GoetasWebservices\SoapServices\SoapClient\Exception\ClientException;
 use GoetasWebservices\SoapServices\SoapClient\Exception\ServerException;
 use GoetasWebservices\SoapServices\SoapClient\Exception\SoapException;
@@ -20,6 +21,7 @@ use Http\Message\MessageFactory;
 use JMS\Serializer\Serializer;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\RequestInterface;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 class Client
 {
@@ -65,8 +67,12 @@ class Client
      */
     private $xmlDecorator;
 
+    /**
+     * @var EventDispatcherInterface
+     */
+    private $eventDispatcher;
 
-    public function __construct(array $serviceDefinition, Serializer $serializer, MessageFactory $messageFactory, HttpClient $client, HeaderHandler $headerHandler)
+    public function __construct(array $serviceDefinition, Serializer $serializer, MessageFactory $messageFactory, HttpClient $client, HeaderHandler $headerHandler, EventDispatcherInterface $eventDispatcher)
     {
         $this->serviceDefinition = $serviceDefinition;
         $this->serializer = $serializer;
@@ -75,6 +81,7 @@ class Client
         $this->messageFactory = $messageFactory;
         $this->argumentsReader = new ArgumentsReader($this->serializer, $headerHandler);
         $this->resultCreator = new ResultCreator($this->serializer, !empty($serviceDefinition['unwrap']));
+        $this->eventDispatcher = $eventDispatcher;
     }
 
     public function __call($functionName, array $args)
@@ -83,6 +90,10 @@ class Client
         $message = $this->argumentsReader->readArguments($args, $soapOperation['input']);
 
         $xmlMessage = $this->serializer->serialize($message, 'xml');
+        $this->eventDispatcher->dispatch(
+            new ClientEvent($xmlMessage, 'soap_client.request_body'), 'soap_client.request_body'
+        );
+
         if (is_callable($this->xmlDecorator)) {
             $xmlMessage = call_user_func($this->xmlDecorator, $xmlMessage);
         }
@@ -106,6 +117,9 @@ class Client
             }
 
             $body = (string)$response->getBody();
+            $this->eventDispatcher->dispatch(
+                new ClientEvent($body, 'soap_client.response_body'), 'soap_client.response_body'
+            );
 
             $faultClass = $this->findFaultClass($response);
 
