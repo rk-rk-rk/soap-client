@@ -149,7 +149,9 @@ class Client
         $context->setAttribute('soapEndpoint', $this->serviceDefinition['endpoint']);
 
         $xmlMessage = $this->serializer->serialize($message, 'xml', $context);
-        $this->eventDispatcher->dispatch(new ClientEvent($xmlMessage), 'soap_client.post_serialize');
+        $this->eventDispatcher->dispatch(
+            new ClientEvent($xmlMessage, 'soap_client.request_body'), 'soap_client.request_body'
+        );
 
         $requestMessage = $this->createRequestMessage($xmlMessage, $soapOperation);
 
@@ -172,7 +174,9 @@ class Client
         }
 
         $body = (string) $responseMessage->getBody();
-        $this->eventDispatcher->dispatch(new ClientEvent($body), 'soap_client.response');
+        $this->eventDispatcher->dispatch(
+            new ClientEvent($body, 'soap_client.response_body'), 'soap_client.response_body'
+        );
 
         if (false !== strpos($body, ':Fault>')) { // some server returns a fault with 200 OK HTTP
             throw $this->createFaultException($responseMessage, $requestMessage);
