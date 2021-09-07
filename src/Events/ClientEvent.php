@@ -7,7 +7,7 @@ use Symfony\Contracts\EventDispatcher\Event;
 class ClientEvent extends Event
 {
     /**
-     * @var string
+     * @var
      */
     private $data;
 
@@ -16,24 +16,28 @@ class ClientEvent extends Event
      */
     private $eventName;
 
-    public function __construct(string &$data, ?string $eventName = null)
+    /**
+     * @param $data
+     * @param ?string $eventName
+     */
+    public function __construct(&$data, ?string $eventName = null)
     {
         $this->data = &$data;
         $this->eventName = $eventName;
     }
 
     /**
-     * @return string
+     * @return mixed
      */
-    public function getData(): string
+    public function getData()
     {
         return $this->data;
     }
 
     /**
-     * @param string $data
+     * @param $data
      */
-    public function setData(string $data): void
+    public function setData($data): void
     {
         $this->data = $data;
     }

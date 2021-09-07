@@ -155,7 +155,15 @@ class Client
 
         $requestMessage = $this->createRequestMessage($xmlMessage, $soapOperation);
 
+        $this->eventDispatcher->dispatch(
+            new ClientEvent($requestMessage, 'soap_client.request_message'), 'soap_client.request_message'
+        );
+
         $responseMessage = $this->client->sendRequest($requestMessage);
+
+        $this->eventDispatcher->dispatch(
+            new ClientEvent($responseMessage, 'soap_client.response_message'), 'soap_client.response_message'
+        );
 
         if ($this->debug) {
             $this->responseMessage = $responseMessage;
